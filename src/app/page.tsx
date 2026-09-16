@@ -185,7 +185,7 @@ export default function Home() {
           for (let c = 0; c < COLS; c++)
             blocks.push({
               x: sx + c * (bw + BGAP),
-              y: 90 + r * (BH + BGAP),
+              y: 150 + r * (BH + BGAP),
               w: bw,
               h: BH,
               alive: true,
@@ -371,7 +371,7 @@ export default function Home() {
         invs = [];
         for (let r = 0; r < IR; r++)
           for (let c = 0; c < IC; c++)
-            invs.push({ x: sx + c * (IW + IGX), y: 80 + r * (IH + IGY), alive: true });
+            invs.push({ x: sx + c * (IW + IGX), y: 140 + r * (IH + IGY), alive: true });
         invDir = 1;
       }
       return {
