@@ -598,7 +598,7 @@ export default function Home() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.png" alt="Atnoia" className="relative z-10 h-auto w-60" />
       <p className="fixed bottom-4 left-0 z-10 w-full text-center text-xs text-gray-400">
-        Atnoia Attention Labs - Un proyecto de Gastón Barcia
+        Atnoia Attention Lab - Un proyecto de Gastón Barcia
       </p>
     </div>
   );
