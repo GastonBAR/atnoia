@@ -597,6 +597,9 @@ export default function Home() {
       <canvas ref={canvasRef} className="fixed top-0 left-0 block h-full w-full" />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.png" alt="Atnoia" className="relative z-10 h-auto w-60" />
+      <p className="fixed bottom-4 left-0 z-10 w-full text-center text-xs text-gray-400">
+        Atnoia Attention Labs - Un proyecto de Gastón Barcia
+      </p>
     </div>
   );
 }
