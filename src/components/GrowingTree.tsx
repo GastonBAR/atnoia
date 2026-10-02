@@ -23,12 +23,8 @@ type Tip = {
 type Palette = { branch: string; root: string; leaf: string; ground: string };
 
 const STEP = 3; // world units per segment
-const MAX_TIPS = 220;
-const TARGET_TIPS = 120;
-const CROWN_START = 40; // initial canopy radius in world units
-const CROWN_SPEED = 5; // initial world units per second the canopy may widen
-const CROWN_SLOWDOWN = 60; // seconds until the canopy widens at half speed
-const ROOT_REACH = 0.8; // roots spread to this fraction of the canopy
+const MAX_TIPS = 140;
+const TARGET_TIPS = 70;
 const MAX_SEGMENTS = 120_000;
 const SEG_FIELDS = 6; // x1, y1, x2, y2, w, kind
 const LEAF_FIELDS = 3; // x, y, r
@@ -78,11 +74,6 @@ export default function GrowingTree() {
     let cacheScale = 1;
     const extent = { up: 1, down: 1, side: 1 };
     let sproutTimer = 0;
-    // Nothing grows past this radius, so the tree fills in evenly instead of
-    // a few limbs stretching out.
-    let crown = CROWN_START;
-    let age = 0;
-    const reach = (kind: Kind) => (kind === BRANCH ? crown : crown * ROOT_REACH);
 
     const originX = () => W / 2;
     const originY = () => H * 0.5;
@@ -124,11 +115,6 @@ export default function GrowingTree() {
       leafCount++;
     }
 
-    function bud(t: Tip) {
-      const n = 3 + Math.floor(Math.random() * 4);
-      for (let i = 0; i < n; i++) pushLeaf(t.x + rand(-5, 5), t.y + rand(-5, 3), rand(1.2, 2.8));
-    }
-
     function split(t: Tip, out: Tip[]) {
       if (t.fan) {
         for (const offset of FAN) {
@@ -148,7 +134,7 @@ export default function GrowingTree() {
       if (t.leader) {
         // The leader never stops: it keeps going and throws a lateral.
         const lateralSide = Math.random() < 0.5 ? -1 : 1;
-        out.push({ ...t, a: t.a + rand(-0.15, 0.15), w: Math.max(2.2, t.w * 0.94), left: t.len, acc: 0 });
+        out.push({ ...t, a: t.a + rand(-0.15, 0.15), w: Math.max(1.2, t.w * 0.94), left: t.len, acc: 0 });
         if (tips.length + out.length < MAX_TIPS) {
           const a = t.a + lateralSide * rand(0.4, t.kind === ROOT ? 1.3 : 0.9);
           out.push({
@@ -165,11 +151,12 @@ export default function GrowingTree() {
         return;
       }
       if (t.w < 0.7) {
-        if (t.kind === BRANCH) bud(t);
+        if (t.kind === BRANCH) {
+          const n = 3 + Math.floor(Math.random() * 4);
+          for (let i = 0; i < n; i++) pushLeaf(t.x + rand(-5, 5), t.y + rand(-5, 3), rand(1.2, 2.8));
+        }
         return; // tip dies
       }
-      // Thin twigs carry leaves along the way, not just at their ends.
-      if (t.kind === BRANCH && t.w < 1.6 && Math.random() < 0.6) bud(t);
       const crowded = tips.length + out.length >= MAX_TIPS;
       const children = crowded ? 1 : Math.random() < 0.25 ? 3 : 2;
       const spread = t.kind === ROOT ? rand(0.35, 0.8) : rand(0.3, 0.6);
@@ -183,24 +170,21 @@ export default function GrowingTree() {
 
     function sprout() {
       if (segCount < 20 || segCount >= MAX_SEGMENTS) return;
-      // Grow a new limb from an existing segment, favouring the outer canopy
-      // (where segments are sparse) so the whole crown fills in evenly.
-      for (let attempt = 0; attempt < 24; attempt++) {
+      // Pick a reasonably thick existing segment and grow a new limb from it.
+      for (let attempt = 0; attempt < 12; attempt++) {
         const i = Math.floor(Math.random() * segCount);
         const o = i * SEG_FIELDS;
         const w = segs[o + 4];
-        if (w < 1) continue;
+        if (w < 1.6) continue;
         const kind = segs[o + 5] as Kind;
-        const room = reach(kind) - Math.hypot(segs[o + 2], segs[o + 3]);
-        if (room < 15 || Math.random() > 1 - room / reach(kind)) continue;
         const baseA = Math.atan2(segs[o + 3] - segs[o + 1], segs[o + 2] - segs[o]);
         const side = Math.random() < 0.5 ? -1 : 1;
-        const len = Math.max(20, room * rand(0.35, 0.6));
+        const len = 25 + w * rand(5, 9);
         const a = baseA + side * rand(0.5, 1.2);
         tips.push({
           x: segs[o + 2], y: segs[o + 3],
           a, home: a,
-          w: Math.max(1, w * rand(0.45, 0.65)),
+          w: w * rand(0.45, 0.65),
           len, left: len, acc: 0, kind, leader: false,
         });
         return;
@@ -208,8 +192,6 @@ export default function GrowingTree() {
     }
 
     function grow(dt: number) {
-      age += dt;
-      crown += (CROWN_SPEED * dt) / (1 + age / CROWN_SLOWDOWN);
       const born: Tip[] = [];
       for (let i = tips.length - 1; i >= 0; i--) {
         const t = tips[i];
@@ -227,16 +209,6 @@ export default function GrowingTree() {
           // Branches stay above ground, roots below it.
           if (up && ny > -1) { ny = -1; t.a += angleDiff(-Math.PI / 2, t.a) * 0.3; }
           if (!up && ny < 1) { ny = 1; t.a += angleDiff(Math.PI / 2, t.a) * 0.3; }
-          if (Math.hypot(nx, ny) > reach(t.kind)) {
-            // Leaders wait at the edge for the canopy to widen; side shoots end there.
-            if (t.leader) {
-              t.acc = 0;
-            } else {
-              if (up) bud(t);
-              tips.splice(i, 1);
-            }
-            break;
-          }
           pushSeg(t.x, t.y, nx, ny, t.w, t.kind);
           t.x = nx; t.y = ny;
           t.w *= t.leader ? 0.9985 : 0.996;
@@ -252,7 +224,7 @@ export default function GrowingTree() {
 
       sproutTimer -= dt;
       if (sproutTimer <= 0) {
-        sproutTimer = rand(0.25, 0.6);
+        sproutTimer = rand(0.6, 1.6);
         if (tips.length < TARGET_TIPS) sprout();
       }
     }
