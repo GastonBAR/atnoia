@@ -18,6 +18,7 @@ type Tip = {
   kind: Kind;
   leader: boolean; // leaders never stop growing
   fan?: boolean; // on its first split, fans out into leaders in every direction
+  wake?: number; // dormant leader: resumes once the reach of its kind gets here
 };
 
 type Palette = { branch: string; root: string; leaf: string; ground: string };
@@ -28,6 +29,12 @@ const TARGET_TIPS = 70;
 const MAX_SEGMENTS = 120_000;
 const SEG_FIELDS = 6; // x1, y1, x2, y2, w, kind
 const LEAF_FIELDS = 3; // x, y, r
+// Leaders may only go as far as the crown (or root mass) behind them is dense.
+// Reach is the radius of a half disc holding this much length per unit area.
+const DENSITY = 0.08;
+const MIN_REACH = 140;
+// A leader that hits the reach rests until the crown fills this much further out.
+const WAKE_MARGIN = 1.2;
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 // Leaders spread over a half circle so the tree widens as fast as it rises.
@@ -73,6 +80,7 @@ export default function GrowingTree() {
     let scale = 1;
     let cacheScale = 1;
     const extent = { up: 1, down: 1, side: 1 };
+    const length = [0, 0]; // total grown length per kind
     let sproutTimer = 0;
 
     const originX = () => W / 2;
@@ -96,6 +104,7 @@ export default function GrowingTree() {
       const o = segCount * SEG_FIELDS;
       segs[o] = x1; segs[o + 1] = y1; segs[o + 2] = x2; segs[o + 3] = y2; segs[o + 4] = w; segs[o + 5] = kind;
       segCount++;
+      length[kind] += STEP;
       if (kind === BRANCH) {
         extent.up = Math.max(extent.up, -y2);
       } else {
@@ -191,10 +200,23 @@ export default function GrowingTree() {
       }
     }
 
+    const reach = (kind: Kind) =>
+      Math.max(MIN_REACH, Math.sqrt((2 * length[kind]) / (Math.PI * DENSITY)));
+
     function grow(dt: number) {
       const born: Tip[] = [];
       for (let i = tips.length - 1; i >= 0; i--) {
         const t = tips[i];
+        if (t.leader && !t.fan) {
+          const limit = reach(t.kind);
+          if (t.wake !== undefined) {
+            if (limit < t.wake) continue;
+            t.wake = undefined;
+          } else if (Math.hypot(t.x, t.y) > limit) {
+            t.wake = limit * WAKE_MARGIN;
+            continue;
+          }
+        }
         const speed = (t.leader ? 11 : 7) * (0.6 + Math.min(1, t.w / 4) * 0.4);
         t.acc += speed * dt;
         let alive = true;
